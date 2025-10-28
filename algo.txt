@@ -1,0 +1,18 @@
+October 21, 2024
+
+Writing out a simple rough draft of an algorith to explore.
+
+Goal - predict where things end up.
+
+Given the PHYSLITE data, we have the trajectories of what goes on during particle collision.
+In each event object, we have essentially all readings at that particular slice of time,
+namely transverse momentum, pseudorapidity, and azithumal momemntum respective to the transverse plane.
+
+Take a look at each event, look at the event after it in time, calculate deltas, plot deltas.
+Do the deltas for deltas
+
+Then, given an arbitrary event, we should take the most likely delta to happen and apply it.
+Repeat this for this arbitrary event until something either cool or dumb happens. Likely nothing.
+
+-------------
+Next task: validate event object --> depth_limit=1, see documentation online.

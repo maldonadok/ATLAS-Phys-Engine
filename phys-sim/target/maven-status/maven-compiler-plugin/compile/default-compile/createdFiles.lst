@@ -1,0 +1,7 @@
+org\qft\ml\objects\leptons\Electron.class
+org\qft\ml\model\Main.class
+org\qft\ml\objects\matter.class
+org\qft\ml\objects\elementary_particle.class
+org\qft\ml\objects\gaugeBosons\Photon.class
+org\qft\ml\structure\point.class
+org\qft\ml\objects\quarks\Up.class
