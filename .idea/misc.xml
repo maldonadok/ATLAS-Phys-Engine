@@ -11,6 +11,7 @@
         <option value="$PROJECT_DIR$/qftmlm-router/pom.xml" />
         <option value="$PROJECT_DIR$/OOPTesting/pom.xml" />
         <option value="$PROJECT_DIR$/phys-sim/pom.xml" />
+        <option value="$PROJECT_DIR$/phys-sim-gui/pom.xml" />
       </list>
     </option>
   </component>

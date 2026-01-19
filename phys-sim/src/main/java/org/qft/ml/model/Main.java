@@ -12,9 +12,13 @@ public class Main {
     public static void main(String[] args) {
 
         //initialTesting();
-        manifoldTesting();
+        //manifoldTesting();
+        operatorTesting();
 
 
+    }
+
+    private static void operatorTesting() {
     }
 
     private static void manifoldTesting() {

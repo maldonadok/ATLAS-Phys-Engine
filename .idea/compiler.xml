@@ -7,8 +7,9 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="webapp" />
-        <module name="phys-sim" />
         <module name="qftmlm-router" />
+        <module name="phys-sim-gui" />
+        <module name="phys-sim" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>

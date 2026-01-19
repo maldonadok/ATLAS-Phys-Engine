@@ -18,11 +18,7 @@ def main():
     #electron_velocity_arr = getVelocity(event_object.getElectrons())
     #electron_pt = np.array(event_object.getElectrons().iloc[:, 0])
     #graphVelocityAndMomentum(electron_velocity_arr, electron_pt)
-
-
-
-
-
+    momentumToParquet(electron_pt)
 
 def getVelocity(df):
     e_mass=scipy.constants.electron_mass
@@ -32,6 +28,11 @@ def getVelocity(df):
         print(momentum/e_mass)
         vel_arr.append(momentum/e_mass)
     return vel_arr
+
+def momentumToParquet(df):
+    file_path = 'C:\\Datasets\\parquet_output\\Electron_pt.parquet'
+    df.to_parquet(file_path, engine='auto', compression='snappy')
+    print(f"DataFrame saved to {file_path}")
 
 def graphVelocityAndMomentum(electron_velocity_arr, electron_pt):
     pass
