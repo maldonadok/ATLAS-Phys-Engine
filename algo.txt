@@ -1,18 +1,22 @@
 October 21, 2024
 
-Writing out a simple rough draft of an algorith to explore.
+Goal - calculate Muon decay.
 
-Goal - predict where things end up.
-
-Given the PHYSLITE data, we have the trajectories of what goes on during particle collision.
+Given the PHYSLITE data, we have the trajectories of what goes on during particle collision in CERN's Large Hadron Collider.
 In each event object, we have essentially all readings at that particular slice of time,
 namely transverse momentum, pseudorapidity, and azithumal momemntum respective to the transverse plane.
 
-Take a look at each event, look at the event after it in time, calculate deltas, plot deltas.
-Do the deltas for deltas
+We're given the above data for Electrons, Muons, and Jets.
+(Jets = reconstructed objects that represent the visible outcome of high-energy quarks and gluons produced in proton–proton collisions)
 
-Then, given an arbitrary event, we should take the most likely delta to happen and apply it.
-Repeat this for this arbitrary event until something either cool or dumb happens. Likely nothing.
+Muons however can decay. Namely muon --> muon neutrino + electron + electron-antineutrino (positron)
+Given the momenta of these muons, we should be able to calculate not only when they decay,
+but the prbable trajectories of the resulting particles.
 
--------------
-Next task: validate event object --> depth_limit=1, see documentation online.
+Simultaneously, we know that strong magnetic fields significantly affect the spin precession of muons, subtly 
+tweaking the decay rate, implicitly measured by the spin direction of the decay products.
+
+Given that the result of these proton-proton collisions results in an explosive 'shrapnel' of electrons travelling
+near the speed of light, a magnetic field must be produced by each and every moving electron. 
+
+We need to be able to calculate this field in all space and calculate/display the expected muon behavior.
