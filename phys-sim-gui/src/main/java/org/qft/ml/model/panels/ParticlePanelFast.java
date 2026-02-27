@@ -1,5 +1,6 @@
-package org.qft.ml.model;
+package org.qft.ml.model.panels;
 
+import org.qft.ml.model.objects.ChargedParticle;
 import org.qft.ml.model.objects.Jet;
 
 import javax.swing.*;
@@ -8,6 +9,7 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
 import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.util.List;
 
@@ -21,10 +23,7 @@ public class ParticlePanelFast extends JPanel implements MouseMotionListener, Mo
     private double angleY = 0;
     private double scale = 1.0;
     private int prevX, prevY;
-    private static final int GRID_SPACING = 1;     // momentum units
     private static final int GRID_EXTENT = 6;      // +/- range
-    private static final Font LABEL_FONT =
-            new Font("SansSerif", Font.PLAIN, 10);
     private static final double JET_CONE_RADIUS = 0.4; // ΔR
     private boolean etaPhiView = false;
     private static final int CONE_SEGMENTS = 32;
@@ -32,7 +31,6 @@ public class ParticlePanelFast extends JPanel implements MouseMotionListener, Mo
     private boolean showElectrons = true;
     private boolean showMuons = true;
     private boolean showJetCones = true;
-    private int lastWidth = -1;
     private HoverHit hovered = null;
     private static final int HOVER_RADIUS_PX = 8;
     // ---- cached trig values (updated once per frame) ----
@@ -45,7 +43,7 @@ public class ParticlePanelFast extends JPanel implements MouseMotionListener, Mo
 
     // ---- hover support ----
     private static final int HOVER_RADIUS_PX_JETS = 6;
-    private int hoveredJetIndex = -1;
+    public boolean minkowskiMode = false;
     private Jet hoveredJet = null;
     private final java.util.List<JetScreenPoint> jetScreenCache = new java.util.ArrayList<>();
 
@@ -53,6 +51,94 @@ public class ParticlePanelFast extends JPanel implements MouseMotionListener, Mo
     private double originPx = 0;
     private double originPy = 0;
     private double originPz = 0;
+    public double simulationTime = 0;
+
+    private List<ChargedParticle> animatedParticles;
+    public Timer animationTimer;
+    private static final double DT = 0.02; // time step
+
+    public void setAnimatedParticles(List<ChargedParticle> particles) {
+        this.animatedParticles = particles;
+    }
+
+    public void startAnimation() {
+
+        if (animatedParticles == null || animatedParticles.isEmpty())
+            return;
+
+        animationTimer = new Timer(16, e -> {   // ~60 FPS
+
+            simulationTime += DT;
+
+            for (ChargedParticle p : animatedParticles) {
+
+                // ---- store current position for trail ----
+                p.trail.addLast(new double[]{p.x, p.y, p.z});
+                if (p.trail.size() > 40)
+                    p.trail.removeFirst();
+
+                // ---- store spacetime event ----
+                p.spacetimeTrail.addLast(
+                        new double[]{p.x, simulationTime}
+                );
+                if (p.spacetimeTrail.size() > 200)
+                    p.spacetimeTrail.removeFirst();
+
+                // ---- update position ----
+                p.x += p.vx * DT;
+                p.y += p.vy * DT;
+                p.z += p.vz * DT;
+                System.out.println(p.x);
+            }
+
+            repaint();
+        });
+
+        animationTimer.start();
+    }
+
+    public void stopAnimation() {
+        if (animationTimer != null)
+            animationTimer.stop();
+    }
+
+    public void initAnimation() {
+        animationTimer = new Timer(16, e -> {
+
+            for (ChargedParticle p : animatedParticles) {
+
+                if (Math.abs(p.x) > 500 ||
+                        Math.abs(p.y) > 500 ||
+                        Math.abs(p.z) > 500) {
+
+                    p.x = 0;
+                    p.y = 0;
+                    p.z = 0;
+                }
+
+                // Trail
+                p.trail.addLast(new double[]{p.x, p.y, p.z});
+                if (p.trail.size() > ChargedParticle.MAX_TRAIL_LENGTH) {
+                    p.trail.removeFirst();
+                }
+
+                simulationTime += DT;
+                p.update(DT);
+
+                // Spacetime trail
+                p.spacetimeTrail.addLast(new double[]{
+                        p.x,
+                        simulationTime * ChargedParticle.c
+                });
+
+                if (p.spacetimeTrail.size() > 200) {
+                    p.spacetimeTrail.removeFirst();
+                }
+            }
+
+            repaint();
+        });
+    }
 
     private static class JetScreenPoint {
         int x, y;
@@ -128,6 +214,7 @@ public class ParticlePanelFast extends JPanel implements MouseMotionListener, Mo
     }
 
     private void renderToBuffer() {
+
         hoverHits.clear();
         jetScreenCache.clear();
 
@@ -152,6 +239,11 @@ public class ParticlePanelFast extends JPanel implements MouseMotionListener, Mo
 
         // ---- now allow alpha blending for particles ----
         g2.setComposite(AlphaComposite.SrcOver);
+
+        if (minkowskiMode) {
+            renderMinkowski(g2);
+            return;
+        }
 
         int cx = w / 2;
         int cy = h / 2;
@@ -232,16 +324,25 @@ public class ParticlePanelFast extends JPanel implements MouseMotionListener, Mo
                 hit.type = "Electron"; // or "Muon"
                 hoverHits.add(hit);
 
-                drawPointWithArrow(
-                        g2,
-                        pt,
-                        p[0], p[1], p[2],
-                        cx, cy, fov,
-                        5,
-                        25,
-                        2.5f,
-                        new Color(255, 0, 0, 220)
-                );
+                if (animatedParticles == null) {
+                    drawPointWithArrow(
+                            g2,
+                            pt,
+                            p[0], p[1], p[2],
+                            cx, cy, fov,
+                            5,
+                            25,
+                            2.5f,
+                            new Color(255, 0, 0, 220)
+                    );
+                } else {
+                    drawDot(
+                            g2,
+                            pt,
+                            5,
+                            new Color(255, 0, 0, 220)
+                    );
+                }
             }
 
         // ---- Muons (bold blue) ----
@@ -258,16 +359,25 @@ public class ParticlePanelFast extends JPanel implements MouseMotionListener, Mo
                 hit.type = "Muon"; // or "Muon"
                 hoverHits.add(hit);
 
-                drawPointWithArrow(
-                        g2,
-                        pt,
-                        p[0], p[1], p[2],
-                        cx, cy, fov,
-                        5,
-                        25,
-                        2.5f,
-                        new Color(0, 80, 255, 220)
-                );
+                if (animatedParticles == null) {
+                    drawPointWithArrow(
+                            g2,
+                            pt,
+                            p[0], p[1], p[2],
+                            cx, cy, fov,
+                            5,
+                            25,
+                            2.5f,
+                            new Color(0, 80, 255, 220)
+                    );
+                } else {
+                    drawDot(
+                            g2,
+                            pt,
+                            5,
+                            new Color(0, 80, 255, 220)
+                    );
+                }
            }
         }
 
@@ -278,6 +388,78 @@ public class ParticlePanelFast extends JPanel implements MouseMotionListener, Mo
                 g2.drawLine(0, cy + i * 120, w, cy + i * 120);
             }
         }
+
+            if (animatedParticles != null) {
+
+                for (ChargedParticle p : animatedParticles) {
+
+                    cx = getWidth() / 2;
+                    cy = getHeight() / 2;
+                    fov = Math.min(getWidth(), getHeight()) * 0.9;
+
+                    int index = 0;
+                    int size = p.trail.size();
+
+                    for (double[] pos : p.trail) {
+
+                        Point trailPoint = project(pos[0], pos[1], pos[2], cx, cy, fov);
+
+                        float alpha = (float) index / size;
+                        alpha *= 0.6f; // control fade strength
+
+                        g2.setComposite(AlphaComposite.getInstance(
+                                AlphaComposite.SRC_OVER,
+                                alpha
+                        ));
+
+                        g2.setColor(Color.MAGENTA);
+                        g2.fillOval(trailPoint.x - 3, trailPoint.y - 3, 6, 6);
+
+                        index++;
+                    }
+
+                    g2.setComposite(AlphaComposite.getInstance(
+                            AlphaComposite.SRC_OVER,
+                            1f
+                    ));
+
+                    // Draw main particle
+                    Point pt = project(p.x, p.y, p.z, cx, cy, fov);
+                    double gamma = p.gamma();
+                    double contraction = 1.0 / gamma;
+
+                    double vx = p.vx;
+                    double vy = p.vy;
+
+                    // Normalize velocity in screen plane
+                    double mag = Math.sqrt(vx*vx + vy*vy);
+                    double ux = 0;
+                    double uy = 0;
+
+                    if (mag > 0) {
+                        ux = vx / mag;
+                        uy = vy / mag;
+                    }
+
+                    int baseSize = 10;
+                    int contractedSize = (int)(baseSize * contraction);
+
+                    // Create transform
+                    AffineTransform old = g2.getTransform();
+
+                    g2.translate(pt.x, pt.y);
+                    g2.rotate(Math.atan2(uy, ux));
+
+                    g2.fillOval(
+                            -baseSize/2,
+                            -contractedSize/2,
+                            baseSize,
+                            contractedSize
+                    );
+
+                    g2.setTransform(old);
+                }
+            }
 
         g2.dispose();
     }
@@ -300,6 +482,60 @@ public class ParticlePanelFast extends JPanel implements MouseMotionListener, Mo
                 break;
         }
         repaint();
+    }
+
+    private void renderMinkowski(Graphics2D g2) {
+
+        int w = getWidth();
+        int h = getHeight();
+
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, w, h);
+
+        g2.setColor(Color.GRAY);
+
+        // Axes
+        g2.drawLine(w/2, 0, w/2, h);     // x = 0
+        g2.drawLine(0, h - 50, w, h - 50); // t = 0 baseline
+
+        double xScale = 50;
+        double tScale = 50;
+
+        for (ChargedParticle p : animatedParticles) {
+
+            int index = 0;
+            int size = p.spacetimeTrail.size();
+
+            for (double[] event : p.spacetimeTrail) {
+
+                double x = event[0];
+                double ct = event[1];
+
+                int screenX = (int)(w/2 + x * xScale);
+                int screenY = (int)(h - 50 - ct * tScale);
+
+                float alpha = (float) index / size;
+
+                g2.setComposite(
+                        AlphaComposite.getInstance(
+                                AlphaComposite.SRC_OVER,
+                                alpha
+                        )
+                );
+
+                g2.setColor(Color.CYAN);
+                g2.fillOval(screenX - 3, screenY - 3, 6, 6);
+
+                index++;
+            }
+
+            g2.setComposite(
+                    AlphaComposite.getInstance(
+                            AlphaComposite.SRC_OVER,
+                            1f
+                    )
+            );
+        }
     }
 
     private double[] normalize(double x, double y, double z) {
@@ -333,37 +569,6 @@ public class ParticlePanelFast extends JPanel implements MouseMotionListener, Mo
         }
     }
 
-    private void drawDataset(BufferedImage buffer,
-                             List<double[]> data,
-                             Color color,
-                             int cx, int cy,
-                             double fov) {
-
-        int w = buffer.getWidth();
-        int h = buffer.getHeight();
-        int argb = color.getRGB();
-
-        for (double[] p : data) {
-            double x = p[0];
-            double y = p[1];
-            double z = p[2];
-
-            // Rotate Y
-            double xRot = x * cosY + z * sinY;
-            double zRot = -x * sinY + z * cosY;
-
-            // Rotate X
-            double yRot   = y * cosX - zRot * sinX;
-            double zRotFinal = y * sinX + zRot * cosX;
-
-            int sx = (int) (cx + scale * xRot * fov / (fov + zRotFinal));
-            int sy = (int) (cy - scale * yRot * fov / (fov + zRotFinal));
-
-            if (sx >= 0 && sx < w && sy >= 0 && sy < h) {
-                buffer.setRGB(sx, sy, argb);
-            }
-        }
-    }
 
     private void drawAxis(Graphics2D g2,
                           int cx, int cy, double fov,
@@ -548,6 +753,20 @@ public class ParticlePanelFast extends JPanel implements MouseMotionListener, Mo
                 az * GRID_EXTENT,
                 cx, cy, fov);
         g2.drawString(label, end.x + 6, end.y + 6);
+    }
+
+    private void drawDot(Graphics2D g2,
+                         Point center,
+                         int radius,
+                         Color color) {
+
+        g2.setColor(color);
+        g2.fillOval(
+                center.x - radius,
+                center.y - radius,
+                radius * 2,
+                radius * 2
+        );
     }
 
     private void drawArrow(Graphics2D g2,
@@ -829,7 +1048,7 @@ public class ParticlePanelFast extends JPanel implements MouseMotionListener, Mo
         int dy = e.getY() - prevY;
 
         angleY += dx * 0.01;
-        angleX += dy * 0.01;
+        angleX += dy * 0.01; 
 
         prevX = e.getX();
         prevY = e.getY();

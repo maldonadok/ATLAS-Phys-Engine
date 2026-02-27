@@ -1,4 +1,4 @@
-package org.qft.ml.model;
+package org.qft.ml.model.panels;
 
 import javax.swing.*;
 import java.awt.*;

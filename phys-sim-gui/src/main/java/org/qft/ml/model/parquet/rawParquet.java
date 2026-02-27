@@ -1,4 +1,4 @@
-package org.qft.ml.model;
+package org.qft.ml.model.parquet;
 import org.apache.parquet.tools.read.SimpleReadSupport;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.example.data.simple.SimpleGroup;

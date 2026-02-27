@@ -1,4 +1,4 @@
-package org.qft.ml.model;
+package org.qft.ml.model.parquet;
 
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
@@ -6,7 +6,11 @@ import org.apache.hadoop.fs.Path;
 import org.apache.parquet.avro.AvroParquetReader;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.util.HadoopInputFile;
+import org.qft.ml.model.calc.EMFieldCalculator;
+import org.qft.ml.model.objects.ChargedParticle;
 import org.qft.ml.model.objects.Jet;
+import org.qft.ml.model.panels.EMFieldPanel;
+import org.qft.ml.model.panels.ParticlePanelFast;
 
 import javax.swing.*;
 import java.awt.*;
@@ -14,7 +18,13 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.qft.ml.model.objects.ChargedParticle.MAX_TRAIL_LENGTH;
+
 public class Parquet3DPlot{
+
+    private static final double C = 3.0e8;              // m/s
+    private static final double VISUAL_C = 3.0;
+    private static final double ELECTRON_CHARGE = -1.602e-19;
     public static void main(String[] args) throws Exception {
 //        if (args.length < 1) {
 //            System.err.println("Usage: java Parquet3DSwing <file.parquet>");
@@ -29,6 +39,8 @@ public class Parquet3DPlot{
         List<double[]> dataB = loadMomenta(filePathB);
         List<double[]> dataC = loadMomenta(filePathC);
 
+        List<ChargedParticle> particles = convertElectronsToChargedParticles(dataC);
+
         // Launch Swing window
         JFrame frame = new JFrame("3D Particle Momenta (Parquet Row-by-Row)");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -36,6 +48,16 @@ public class Parquet3DPlot{
 
         ParticlePanelFast panel =
                 new ParticlePanelFast(dataA, dataB, dataC);
+
+        panel.setAnimatedParticles(particles);
+        panel.initAnimation();
+        final double dt = 1.0; // time step per frame
+
+        JButton startAnimationBtn = new JButton("Start Animation");
+        JButton stopAnimationBtn = new JButton("Stop Animation");
+        startAnimationBtn.addActionListener(e -> panel.startAnimation());
+        stopAnimationBtn.addActionListener(e -> panel.stopAnimation());
+
         JLayeredPane layeredPane = new JLayeredPane();
         layeredPane.setLayout(null);
 
@@ -45,9 +67,9 @@ public class Parquet3DPlot{
         JPanel cameraPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
         cameraPanel.setOpaque(false);
 
-        JButton topBtn  = new JButton("Top");
+        JButton topBtn = new JButton("Top");
         JButton sideBtn = new JButton("Side");
-        JButton isoBtn  = new JButton("Iso");
+        JButton isoBtn = new JButton("Iso");
 
         topBtn.addActionListener(e ->
                 panel.setCameraPreset(ParticlePanelFast.CameraPreset.TOP));
@@ -61,8 +83,42 @@ public class Parquet3DPlot{
         cameraPanel.add(isoBtn);
 
         JPanel root = new JPanel(new BorderLayout());
-        root.add(panel, BorderLayout.CENTER);
+        root.add(layeredPane, BorderLayout.CENTER);
         root.add(cameraPanel, BorderLayout.SOUTH);
+
+        // EM Field graph button
+        JButton fieldButton = new JButton("Compute E-Field");
+
+        fieldButton.addActionListener(e -> {
+
+            double[][][] field =
+                    EMFieldCalculator.computeField(dataC, 40, 5);
+
+            JFrame fieldFrame = new JFrame("Electromagnetic Field");
+            fieldFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+            fieldFrame.add(new EMFieldPanel(field));
+            fieldFrame.pack();
+            fieldFrame.setVisible(true);
+        });
+
+        JButton minkowskiButton = new JButton("Minkowski Spacetime");
+        minkowskiButton.addActionListener(e -> {
+            panel.minkowskiMode = !panel.minkowskiMode;
+            panel.repaint();
+        });
+
+        // Panel for buttons
+        JPanel controlPanel = new JPanel(new FlowLayout());
+
+        controlPanel.add(topBtn);
+        controlPanel.add(sideBtn);
+        controlPanel.add(isoBtn);
+        controlPanel.add(fieldButton);
+        controlPanel.add(startAnimationBtn);
+        controlPanel.add(stopAnimationBtn);
+        controlPanel.add(minkowskiButton);
+        root.add(controlPanel, BorderLayout.SOUTH);
+
 
         cameraPanel.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
         cameraPanel.setBackground(new Color(255, 255, 255, 220));
@@ -96,6 +152,7 @@ public class Parquet3DPlot{
                 buttonSize,
                 buttonSize
         );
+
 
         layeredPane.add(zoomInBtn, JLayeredPane.PALETTE_LAYER);
         layeredPane.add(zoomOutBtn, JLayeredPane.PALETTE_LAYER);
@@ -147,6 +204,40 @@ public class Parquet3DPlot{
             }
             return data;
         }
+    }
+
+    public static List<ChargedParticle> convertElectronsToChargedParticles(
+            List<double[]> electrons) {
+
+        List<ChargedParticle> particles = new ArrayList<>();
+
+        for (double[] e : electrons) {
+
+            double px = e[0];
+            double py = e[1];
+            double pz = e[2];
+
+            double pMag = Math.sqrt(px*px + py*py + pz*pz);
+
+            if (pMag == 0) continue;
+
+            // Normalize momentum direction
+            double vx = (px / pMag) * C;
+            double vy = (py / pMag) * C;
+            double vz = (pz / pMag) * C;
+
+            // For now, assume electrons originate at collision center
+            ChargedParticle particle =
+                    new ChargedParticle(
+                            0, 0, 0,     // initial position
+                            vx, vy, vz,  // velocity
+                            ELECTRON_CHARGE
+                    );
+
+            particles.add(particle);
+        }
+
+        return particles;
     }
 
     private static List<double[]> loadMomenta(String filePath) throws Exception {
